@@ -1,25 +1,43 @@
 package entertainment.githubsearchlist;
 
+import android.app.SearchManager;
+import android.content.Context;
+import android.content.Intent;
 import android.support.v7.app.AppCompatActivity;
 import android.os.Bundle;
+import android.support.v7.widget.DefaultItemAnimator;
+import android.support.v7.widget.DividerItemDecoration;
+import android.support.v7.widget.LinearLayoutManager;
+import android.support.v7.widget.RecyclerView;
+import android.support.v7.widget.SearchView;
 import android.util.Log;
+import android.view.Menu;
+import android.view.MenuInflater;
+import android.widget.TextView;
 import android.widget.Toast;
 
 import com.jakewharton.retrofit2.adapter.rxjava2.RxJava2CallAdapterFactory;
 
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Timer;
+import java.util.TimerTask;
+import java.util.concurrent.TimeUnit;
 
+import butterknife.BindView;
 import butterknife.ButterKnife;
 import io.reactivex.ObservableOnSubscribe;
 import io.reactivex.Scheduler;
 import io.reactivex.android.schedulers.AndroidSchedulers;
 import io.reactivex.annotations.NonNull;
 import io.reactivex.disposables.Disposable;
+import io.reactivex.functions.Consumer;
 import io.reactivex.functions.Function;
+import io.reactivex.observers.DisposableObserver;
 import io.reactivex.schedulers.Schedulers;
 import io.reactivex.Observable;
 import io.reactivex.Observer;
+import okhttp3.OkHttpClient;
 import retrofit2.Retrofit;
 import retrofit2.converter.gson.GsonConverterFactory;
 
@@ -27,7 +45,10 @@ public class MainActivity extends AppCompatActivity {
     private static final String LOG_TAG = MainActivity.class.getSimpleName();
     private static final String URL = "https://api.github.com/";
     private ArrayList<User> list = new ArrayList<>();
-    private int i = 0;
+    private GithubUserAdapter githubUserAdapter;
+
+    @BindView(R.id.recycler_view)
+    RecyclerView recyclerView;
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
@@ -35,11 +56,28 @@ public class MainActivity extends AppCompatActivity {
         setContentView(R.layout.activity_main);
         ButterKnife.bind(this);
 
-        getUsersOfGithub();
+        //getUsersOfGithub();
+        User user = new User();
+        user.setUser("Vats");
+        user.setFollowers(10);
+        User user1 = new User();
+        user1.setUser("This");
+        user1.setFollowers(30);
+        list.add(user);
+        list.add(user1);
+       displayListOnRecyclerView(list);
+       getUsersOfGithub();
     }
 
     private void getUsersOfGithub() {
-        Retrofit retrofit = new Retrofit.Builder()
+        OkHttpClient.Builder okhttpClientBuilder = new OkHttpClient.Builder();
+       // okhttpClientBuilder.connectTimeout(30, TimeUnit.SECONDS);
+        //okhttpClientBuilder.readTimeout(30, TimeUnit.SECONDS);
+        //okhttpClientBuilder.writeTimeout(30, TimeUnit.SECONDS);
+
+        okhttpClientBuilder.addInterceptor(new AuthenticationInterceptor());
+
+        Retrofit retrofit = new Retrofit.Builder().client(okhttpClientBuilder.build())
                 .baseUrl(URL)
                 .addCallAdapterFactory(RxJava2CallAdapterFactory.create())
                 .addConverterFactory(GsonConverterFactory.create())
@@ -47,7 +85,7 @@ public class MainActivity extends AppCompatActivity {
 
         Log.i(LOG_TAG, "retrofit, " + retrofit);
 
-        RetrofitClient apiService = retrofit.create(RetrofitClient.class);
+        final RetrofitClient apiService = retrofit.create(RetrofitClient.class);
 
         Observable<List<User>> observableList = apiService.getUsers();
         Log.i(LOG_TAG, "observable, " + observableList);
@@ -63,12 +101,106 @@ public class MainActivity extends AppCompatActivity {
                         return Observable.fromIterable(users);
                     }
                 }).concatMap(new Function<User, Observable<User>>() {
-                        @Override
-                        public Observable<User> apply(User user) throws Exception {
-                            return apiService.getUserFollowers(user.user).subscribeOn(Schedulers.io());
-                        }
-                 })
-                .subscribe(new Observer<User>() {
+            @Override
+            public Observable<User> apply(User user) throws Exception {
+                return apiService.getUserFollowers(user.user).subscribeOn(Schedulers.io()).observeOn(AndroidSchedulers.mainThread())
+                        .debounce(1, TimeUnit.SECONDS, AndroidSchedulers.mainThread());
+            }
+              }).subscribe(new Observer<User>() {
+            @Override
+            public void onSubscribe(Disposable d) {
+                Log.i(LOG_TAG, "onSubscribe");
+            }
+
+            @Override
+            public void onNext(User user) {
+                Log.i(LOG_TAG, "onNext: ," + user.getUser() + " " + user.getFollowers());
+                list.add(user);
+                 githubUserAdapter.notifyDataSetChanged();
+                // displayListOnRecyclerView(list);
+            }
+
+            @Override
+            public void onError(Throwable e) {
+                Log.e(LOG_TAG, "error, " + e);
+            }
+
+            @Override
+            public void onComplete() {
+                Log.i(LOG_TAG, "All users emitted!");
+                // Stuff that updates the UI
+                //  displayListOnRecyclerView(list);
+
+            }
+
+        });
+/*new Consumer<User>() {
+            @Override
+            public void accept(User user) {
+
+                Log.i(LOG_TAG, "user, " + user.getUser());
+                list.add((user));
+                githubUserAdapter.notifyDataSetChanged();
+               // textViewList.setText(user.getUser());
+            }
+        });*/
+
+
+/*
+            @Override
+            public void onNext(User user) {
+                Log.i(LOG_TAG, "onNext, " + user.getUser());
+                int position = list.indexOf(user);
+
+                if (position == -1) {
+                    // TODO - take action
+                    // Ticket not found in the list
+                    // This shouldn't happen
+                    return;
+                }
+
+                list.add(user);
+              //  githubUserAdapter.notifyDataSetChanged();
+            }
+
+            @Override
+            public void onError(Throwable e) {
+                Log.e(LOG_TAG, "error," + e);
+            }
+
+            @Override
+            public void onComplete() {
+             Log.i(LOG_TAG, "OnComplete called");
+            }
+        });*/
+
+        /*Timer t = new Timer();
+        TimerTask task = new TimerTask() {
+
+            @Override
+            public void run() {
+                runOnUiThread(new Runnable() {
+
+                    @Override
+                    public void run() {
+                        Intent intent = new Intent(MainActivity.this, DisplayListActivity.class);
+                        Bundle bundle = new Bundle();
+                        bundle.putParcelableArrayList("List", (ArrayList<? extends Parcelable>) list);
+                        intent.putExtras(bundle);
+                        startActivity(intent);
+                    }
+                });
+            }
+        };
+
+        t.scheduleAtFixedRate(task, 0, 8000);*/
+
+    /*    Intent intent = new Intent(MainActivity.this, DisplayListActivity.class);
+        Bundle bundle = new Bundle();
+        bundle.putParcelableArrayList("List", (ArrayList<? extends Parcelable>) list);
+        intent.putExtras(bundle);
+        startActivity(intent);*/
+                /*.subscribe(new Observer<User>() {
                     @Override
                     public void onSubscribe(Disposable d) {
                         Log.i(LOG_TAG, "onSubscribe");
@@ -78,29 +210,119 @@ public class MainActivity extends AppCompatActivity {
                     public void onNext(User user) {
                         Log.i(LOG_TAG, "onNext: ," + user.getUser() + " " + user.getFollowers());
                         list.add(user);
+                       // githubUserAdapter.notifyDataSetChanged();
+                       // displayListOnRecyclerView(list);
                     }
 
                     @Override
                     public void onError(Throwable e) {
-                          Log.e(LOG_TAG, "error");
+                        Log.e(LOG_TAG, "error");
                     }
 
                     @Override
                     public void onComplete() {
-                        Log.e(LOG_TAG, "All users emitted!");
+                        Log.i(LOG_TAG, "All users emitted!");
+                        // Stuff that updates the UI
+                      //  displayListOnRecyclerView(list);
 
-                        displayListOnRecyclerView(list);
                     }
 
-                });
-    }
-
-    private void displayListOnRecyclerView(ArrayList<User> list) {
-        if (list.isEmpty()) {
-            return;
+                });*/
         }
 
-
+    private void displayListOnRecyclerView(ArrayList<User> list) {
+        Log.i(LOG_TAG, "displaye recyclerview");
+       githubUserAdapter = new GithubUserAdapter(list);
+       RecyclerView.LayoutManager layoutManager = new LinearLayoutManager(getApplicationContext());
+       recyclerView.setLayoutManager(layoutManager);
+       recyclerView.setItemAnimator(new DefaultItemAnimator());
+        recyclerView.addItemDecoration(new DividerItemDecoration(this, LinearLayoutManager.VERTICAL));
+        recyclerView.setAdapter(githubUserAdapter);
     }
 
-}
+    @Override
+    public boolean onCreateOptionsMenu(Menu menu) {
+        MenuInflater inflater = getMenuInflater();
+        inflater.inflate(R.menu.options_menu, menu);
+        SearchManager searchManager =
+                (SearchManager) getSystemService(Context.SEARCH_SERVICE);
+        SearchView searchView =
+                (SearchView) menu.findItem(R.id.search).getActionView();
+        searchView.setSearchableInfo(
+                searchManager.getSearchableInfo(getComponentName()));
+        searchView.setSubmitButtonEnabled(true);
+        searchView.setOnQueryTextListener(new SearchView.OnQueryTextListener() {
+            @Override
+            public boolean onQueryTextSubmit(String query) {
+                // use this method when query submitted
+                Toast.makeText(MainActivity.this, query, Toast.LENGTH_SHORT).show();
+                githubUserAdapter.getFilter().filter(query);
+                return true;
+            }
+
+            @Override
+            public boolean onQueryTextChange(String newText) {
+                // use this method for auto complete search process
+                Log.i(LOG_TAG, "newText, " + newText);
+                githubUserAdapter.getFilter().filter(newText);
+                return true;
+            }
+        });
+        return true;
+    }
+
+    @Override
+    protected void onNewIntent(Intent intent) {
+      //  handleIntent(intent);
+    }
+
+    /*private void handleIntent(Intent intent) {
+
+        if (Intent.ACTION_SEARCH.equals(intent.getAction())) {
+            String query = intent.getStringExtra(SearchManager.QUERY);
+            //use the query to search
+            githubUserAdapter.filter(query);
+
+        }
+    }
+
+    @Override
+    public boolean onQueryTextSubmit(String query) {
+        Toast.makeText(MainActivity.this, query, Toast.LENGTH_SHORT).show();
+        githubUserAdapter.filter(query);
+        return true;
+    }
+
+    @Override
+    public boolean onQueryTextChange(String newText) {
+        githubUserAdapter.filter(newText);
+        return true;
+    }*/
+   /* new Observer<User>() {
+        @Override
+        public void onSubscribe(Disposable d) {
+            Log.i(LOG_TAG, "onSubscribe");
+        }
+
+        @Override
+        public void onNext(User user) {
+            Log.i(LOG_TAG, "onNext: ," + user.getUser() + " " + user.getFollowers());
+            list.add(user);
+            // githubUserAdapter.notifyDataSetChanged();
+            // displayListOnRecyclerView(list);
+        }
+
+        @Override
+        public void onError(Throwable e) {
+            Log.e(LOG_TAG, "error");
+        }
+
+        @Override
+        public void onComplete() {
+            Log.i(LOG_TAG, "All users emitted!");
+            // Stuff that updates the UI
+            //  displayListOnRecyclerView(list);
+
+        }*/
+
+    }
