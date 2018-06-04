@@ -23,7 +23,6 @@ public class GithubUserAdapter extends RecyclerView.Adapter<GithubUserAdapter.My
 
     public GithubUserAdapter(List<User> githubUserList) {
         this.githubUserList = githubUserList;
-        Collections.sort(githubUserList, new SortByFollower());
         this.githubfilterresult = githubUserList;
     }
 

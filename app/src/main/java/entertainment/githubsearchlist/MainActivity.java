@@ -13,12 +13,15 @@ import android.support.v7.widget.SearchView;
 import android.util.Log;
 import android.view.Menu;
 import android.view.MenuInflater;
+import android.view.View;
+import android.widget.ProgressBar;
 import android.widget.Toast;
 
 import com.jakewharton.retrofit2.adapter.rxjava2.RxJava2CallAdapterFactory;
 
 import java.io.File;
 import java.util.ArrayList;
+import java.util.Collections;
 import java.util.List;
 import java.util.concurrent.TimeUnit;
 
@@ -44,32 +47,31 @@ public class MainActivity extends AppCompatActivity {
 
     @BindView(R.id.recycler_view)
     RecyclerView recyclerView;
+    @BindView(R.id.progress_bar)
+    ProgressBar progressBar;
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
         setContentView(R.layout.activity_main);
         ButterKnife.bind(this);
-
+        Log.i(LOG_TAG, "onCreate called");
         //getUsersOfGithub();
         User user = new User();
         user.setUser("Vats");
-        user.setFollowers(10);
+        user.setFollowers(50);
         User user1 = new User();
         user1.setUser("This");
         user1.setFollowers(30);
         list.add(user);
         list.add(user1);
+        Collections.sort(list, new SortByFollower());
         displayListOnRecyclerView(list);
         getUsersOfGithub();
     }
 
     private void getUsersOfGithub() {
         OkHttpClient.Builder okhttpClientBuilder = new OkHttpClient.Builder();
-        // okhttpClientBuilder.connectTimeout(30, TimeUnit.SECONDS);
-        //okhttpClientBuilder.readTimeout(30, TimeUnit.SECONDS);
-        //okhttpClientBuilder.writeTimeout(30, TimeUnit.SECONDS);
-
         okhttpClientBuilder.addInterceptor(new AuthenticationInterceptor(MainActivity.this));
         File httpCacheDirectory = new File(getCacheDir(), "responses");
         int cacheSize = 10 * 1024 * 1024; // 10 MiB
@@ -115,6 +117,7 @@ public class MainActivity extends AppCompatActivity {
             public void onNext(User user) {
                 Log.i(LOG_TAG, "onNext: ," + user.getUser() + " " + user.getFollowers());
                 list.add(user);
+                Collections.sort(list, new SortByFollower());
                 githubUserAdapter.notifyDataSetChanged();
                 // displayListOnRecyclerView(list);
             }
@@ -122,14 +125,13 @@ public class MainActivity extends AppCompatActivity {
             @Override
             public void onError(Throwable e) {
                 Log.e(LOG_TAG, "error, " + e);
+                progressBar.setVisibility(View.GONE);
             }
 
             @Override
             public void onComplete() {
                 Log.i(LOG_TAG, "All users emitted!");
-                // Stuff that updates the UI
-                //  displayListOnRecyclerView(list);
-
+                progressBar.setVisibility(View.GONE);
             }
 
         });
