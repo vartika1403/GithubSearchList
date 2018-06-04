@@ -13,30 +13,25 @@ import android.support.v7.widget.SearchView;
 import android.util.Log;
 import android.view.Menu;
 import android.view.MenuInflater;
-import android.widget.TextView;
 import android.widget.Toast;
 
 import com.jakewharton.retrofit2.adapter.rxjava2.RxJava2CallAdapterFactory;
 
+import java.io.File;
 import java.util.ArrayList;
 import java.util.List;
-import java.util.Timer;
-import java.util.TimerTask;
 import java.util.concurrent.TimeUnit;
 
 import butterknife.BindView;
 import butterknife.ButterKnife;
-import io.reactivex.ObservableOnSubscribe;
-import io.reactivex.Scheduler;
 import io.reactivex.android.schedulers.AndroidSchedulers;
 import io.reactivex.annotations.NonNull;
 import io.reactivex.disposables.Disposable;
-import io.reactivex.functions.Consumer;
 import io.reactivex.functions.Function;
-import io.reactivex.observers.DisposableObserver;
 import io.reactivex.schedulers.Schedulers;
 import io.reactivex.Observable;
 import io.reactivex.Observer;
+import okhttp3.Cache;
 import okhttp3.OkHttpClient;
 import retrofit2.Retrofit;
 import retrofit2.converter.gson.GsonConverterFactory;
@@ -65,17 +60,21 @@ public class MainActivity extends AppCompatActivity {
         user1.setFollowers(30);
         list.add(user);
         list.add(user1);
-       displayListOnRecyclerView(list);
-       getUsersOfGithub();
+        displayListOnRecyclerView(list);
+        getUsersOfGithub();
     }
 
     private void getUsersOfGithub() {
         OkHttpClient.Builder okhttpClientBuilder = new OkHttpClient.Builder();
-       // okhttpClientBuilder.connectTimeout(30, TimeUnit.SECONDS);
+        // okhttpClientBuilder.connectTimeout(30, TimeUnit.SECONDS);
         //okhttpClientBuilder.readTimeout(30, TimeUnit.SECONDS);
         //okhttpClientBuilder.writeTimeout(30, TimeUnit.SECONDS);
 
-        okhttpClientBuilder.addInterceptor(new AuthenticationInterceptor());
+        okhttpClientBuilder.addInterceptor(new AuthenticationInterceptor(MainActivity.this));
+        File httpCacheDirectory = new File(getCacheDir(), "responses");
+        int cacheSize = 10 * 1024 * 1024; // 10 MiB
+        Cache cache = new Cache(httpCacheDirectory, cacheSize);
+        okhttpClientBuilder.cache(cache);
 
         Retrofit retrofit = new Retrofit.Builder().client(okhttpClientBuilder.build())
                 .baseUrl(URL)
@@ -106,7 +105,7 @@ public class MainActivity extends AppCompatActivity {
                 return apiService.getUserFollowers(user.user).subscribeOn(Schedulers.io()).observeOn(AndroidSchedulers.mainThread())
                         .debounce(1, TimeUnit.SECONDS, AndroidSchedulers.mainThread());
             }
-              }).subscribe(new Observer<User>() {
+        }).subscribe(new Observer<User>() {
             @Override
             public void onSubscribe(Disposable d) {
                 Log.i(LOG_TAG, "onSubscribe");
@@ -116,7 +115,7 @@ public class MainActivity extends AppCompatActivity {
             public void onNext(User user) {
                 Log.i(LOG_TAG, "onNext: ," + user.getUser() + " " + user.getFollowers());
                 list.add(user);
-                 githubUserAdapter.notifyDataSetChanged();
+                githubUserAdapter.notifyDataSetChanged();
                 // displayListOnRecyclerView(list);
             }
 
@@ -228,14 +227,14 @@ public class MainActivity extends AppCompatActivity {
                     }
 
                 });*/
-        }
+    }
 
     private void displayListOnRecyclerView(ArrayList<User> list) {
         Log.i(LOG_TAG, "displaye recyclerview");
-       githubUserAdapter = new GithubUserAdapter(list);
-       RecyclerView.LayoutManager layoutManager = new LinearLayoutManager(getApplicationContext());
-       recyclerView.setLayoutManager(layoutManager);
-       recyclerView.setItemAnimator(new DefaultItemAnimator());
+        githubUserAdapter = new GithubUserAdapter(list);
+        RecyclerView.LayoutManager layoutManager = new LinearLayoutManager(getApplicationContext());
+        recyclerView.setLayoutManager(layoutManager);
+        recyclerView.setItemAnimator(new DefaultItemAnimator());
         recyclerView.addItemDecoration(new DividerItemDecoration(this, LinearLayoutManager.VERTICAL));
         recyclerView.setAdapter(githubUserAdapter);
     }
@@ -273,56 +272,10 @@ public class MainActivity extends AppCompatActivity {
 
     @Override
     protected void onNewIntent(Intent intent) {
-      //  handleIntent(intent);
+        //  handleIntent(intent);
     }
-
-    /*private void handleIntent(Intent intent) {
-
-        if (Intent.ACTION_SEARCH.equals(intent.getAction())) {
-            String query = intent.getStringExtra(SearchManager.QUERY);
-            //use the query to search
-            githubUserAdapter.filter(query);
-
-        }
-    }
-
     @Override
-    public boolean onQueryTextSubmit(String query) {
-        Toast.makeText(MainActivity.this, query, Toast.LENGTH_SHORT).show();
-        githubUserAdapter.filter(query);
-        return true;
+    public void onBackPressed() {
+        finish();
     }
-
-    @Override
-    public boolean onQueryTextChange(String newText) {
-        githubUserAdapter.filter(newText);
-        return true;
-    }*/
-   /* new Observer<User>() {
-        @Override
-        public void onSubscribe(Disposable d) {
-            Log.i(LOG_TAG, "onSubscribe");
-        }
-
-        @Override
-        public void onNext(User user) {
-            Log.i(LOG_TAG, "onNext: ," + user.getUser() + " " + user.getFollowers());
-            list.add(user);
-            // githubUserAdapter.notifyDataSetChanged();
-            // displayListOnRecyclerView(list);
-        }
-
-        @Override
-        public void onError(Throwable e) {
-            Log.e(LOG_TAG, "error");
-        }
-
-        @Override
-        public void onComplete() {
-            Log.i(LOG_TAG, "All users emitted!");
-            // Stuff that updates the UI
-            //  displayListOnRecyclerView(list);
-
-        }*/
-
-    }
+}
