@@ -2,7 +2,6 @@ package entertainment.githubsearchlist;
 
 import android.support.annotation.NonNull;
 import android.support.v7.widget.RecyclerView;
-import android.util.Log;
 import android.view.LayoutInflater;
 import android.view.View;
 import android.view.ViewGroup;
@@ -11,7 +10,6 @@ import android.widget.Filterable;
 import android.widget.TextView;
 
 import java.util.ArrayList;
-import java.util.Collections;
 import java.util.List;
 
 public class GithubUserAdapter extends RecyclerView.Adapter<GithubUserAdapter.MyViewHolder>
@@ -53,8 +51,8 @@ public class GithubUserAdapter extends RecyclerView.Adapter<GithubUserAdapter.My
         public MyViewHolder(View itemView) {
             super(itemView);
 
-            githubUser = (TextView)itemView.findViewById(R.id.user_name_text);
-            githubUserFollowerCount = (TextView)itemView.findViewById(R.id.user_follower_count_text);
+            githubUser = itemView.findViewById(R.id.user_name_text);
+            githubUserFollowerCount = itemView.findViewById(R.id.user_follower_count_text);
         }
     }
 
@@ -68,13 +66,9 @@ public class GithubUserAdapter extends RecyclerView.Adapter<GithubUserAdapter.My
                     githubfilterresult = githubUserList;
                 } else {
                     List<User> filteredList = new ArrayList<>();
-                    for (User row : githubUserList) {
-                        Log.i(LOG_TAG, "row, " + row.user);
-                        // name match condition. this might differ depending on your requirement
-                        // here we are looking for name or phone number match
-                        if (row.user.toLowerCase().contains(charString.toLowerCase())) {
-                            filteredList.add(row);
-                            Log.i(LOG_TAG, "filtered list," + filteredList);
+                    for (User user : githubUserList) {
+                        if (user.getUser().toLowerCase().contains(charString.toLowerCase())) {
+                            filteredList.add(user);
                         }
 
                         githubfilterresult = filteredList;
@@ -88,7 +82,6 @@ public class GithubUserAdapter extends RecyclerView.Adapter<GithubUserAdapter.My
 
             @Override
             protected void publishResults(CharSequence charSequence, FilterResults filterResults) {
-                Log.i(LOG_TAG, "filterresult," + filterResults);
                 githubUserList = (ArrayList<User>) filterResults.values;
                 notifyDataSetChanged();
             }
